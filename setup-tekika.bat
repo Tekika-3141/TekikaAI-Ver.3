@@ -14,6 +14,10 @@ if errorlevel 1 (
 set "BACKEND_DIR=%~dp0tekika-ai-backend"
 set "FRONTEND_DIR=%~dp0tekika-ai-frontend"
 set "VENV_DIR=%BACKEND_DIR%\.venv"
+rem Reuse the legacy sibling venv created by older setup versions.
+if not exist "%VENV_DIR%\Scripts\python.exe" if exist "%BACKEND_DIR%.venv\Scripts\python.exe" (
+    set "VENV_DIR=%BACKEND_DIR%.venv"
+)
 set "VENV_PYTHON=%VENV_DIR%\Scripts\python.exe"
 set "OLLAMA_URL=https://ollama.com/download/windows"
 set "OLLAMA_PS=irm https://ollama.com/install.ps1 | iex"
