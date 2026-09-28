@@ -90,6 +90,8 @@ set "OLLAMA_MODEL_OK=0"
 set "OLLAMA_MODEL=qwen2.5:latest"
 
 set "MISSING_COUNT=0"
+set "MISSING_REQ_FILE=%TEMP%\tekika-missing-requirements-%RANDOM%%RANDOM%.txt"
+set "REQ_RECHECK_FILE=%TEMP%\tekika-recheck-requirement-%RANDOM%%RANDOM%.txt"
 set "LLM_PROVIDER=ollama"
 if exist "%BACKEND_DIR%\.env" (
     for /f "usebackq tokens=1,* delims==" %%A in (`findstr /B /C:"LLM_PROVIDER=" "%BACKEND_DIR%\.env"`) do set "LLM_PROVIDER=%%B"
@@ -161,8 +163,9 @@ if "!PYTHON_OK!"=="1" if "!VENV_OK!"=="1" (
         echo !C_RED![NG] requirements.txt was not found.!C_RESET!
         set /a MISSING_COUNT+=1
     ) else (
-        call :VERIFY_REQUIREMENTS
+        call :COLLECT_MISSING_REQUIREMENTS "%BACKEND_DIR%\requirements.txt" "%MISSING_REQ_FILE%"
         if errorlevel 1 (
+            echo !C_YELLOW![WARN] Some Python requirements are missing or incompatible in .venv.!C_RESET!
             set /a MISSING_COUNT+=1
         ) else (
             echo !C_GREEN![OK] All requirements from requirements.txt are installed in .venv.!C_RESET!
@@ -399,35 +402,19 @@ rem Installation approval: Python packages
 rem ================================================================
 
 if "!PYTHON_OK!"=="1" if "!VENV_OK!"=="1" if "!PYTHON_PACKAGES_OK!"=="0" (
-    echo !C_WHITE!Some Python packages are missing.!C_RESET!
+    echo !C_WHITE!Some Python requirements are missing or incompatible.!C_RESET!
     echo.
-    choice /C YN /N /M "Install Python dependencies from requirements.txt? [Y/N]: "
-
-    if errorlevel 2 (
-        echo !C_YELLOW![SKIP] Python dependency installation skipped.!C_RESET!
+    call :INSTALL_MISSING_REQUIREMENTS "%MISSING_REQ_FILE%"
+    if errorlevel 1 (
+        set "PYTHON_PACKAGES_OK=0"
     ) else (
-        cd /d "%BACKEND_DIR%"
-
-        echo.
-        if not exist requirements.txt (
-            echo !C_RED![ERROR] requirements.txt was not found.!C_RESET!
+        call :COLLECT_MISSING_REQUIREMENTS "%BACKEND_DIR%\requirements.txt" "%MISSING_REQ_FILE%"
+        if errorlevel 1 (
+            echo !C_RED![ERROR] Some requirements are still unavailable in .venv.!C_RESET!
+            set "PYTHON_PACKAGES_OK=0"
         ) else (
-            echo.
-            echo !C_CYAN!Installing missing Python dependencies from requirements.txt...!C_RESET!
-            "%VENV_PYTHON%" -m pip install -r requirements.txt --progress-bar on
-
-            if errorlevel 1 (
-                echo !C_RED![ERROR] Python dependency installation failed.!C_RESET!
-                echo !C_YELLOW![INFO] Setup remains incomplete until all requirements install successfully.!C_RESET!
-            ) else (
-                call :VERIFY_REQUIREMENTS
-                if errorlevel 1 (
-                    echo !C_RED![ERROR] Some requirements are still unavailable in .venv.!C_RESET!
-                ) else (
-                    echo !C_GREEN![OK] Python dependencies installed and verified in .venv.!C_RESET!
-                    set "PYTHON_PACKAGES_OK=1"
-                )
-            )
+            echo !C_GREEN![OK] Python dependencies installed and verified in .venv.!C_RESET!
+            set "PYTHON_PACKAGES_OK=1"
         )
     )
 
@@ -599,30 +586,7 @@ rem ================================================================
 rem Final environment creation
 rem ================================================================
 
-:VERIFY_REQUIREMENTS
-if not exist "%BACKEND_DIR%\requirements.txt" (
-    echo !C_RED![NG] requirements.txt was not found.!C_RESET!
-    exit /b 1
-)
-
-set "REQ_MISSING=0"
-for /f "usebackq tokens=* delims=" %%R in ("%BACKEND_DIR%\requirements.txt") do (
-    set "REQ_LINE=%%R"
-    if not "!REQ_LINE!"=="" if not "!REQ_LINE:~0,1!"=="#" (
-        for /f "tokens=1 delims=<>=!~[" %%P in ("!REQ_LINE!") do (
-            "%VENV_PYTHON%" -m pip show "%%P" >nul 2>&1
-            if errorlevel 1 (
-                echo !C_RED![NG] Missing package from requirements.txt: %%P!C_RESET!
-                set "REQ_MISSING=1"
-            )
-        )
-    )
-)
-
-if "!REQ_MISSING!"=="1" (
-    exit /b 1
-)
-exit /b 0
+goto :CREATE_ENV_AND_FINISH
 
 :CREATE_ENV_AND_FINISH
 
@@ -695,9 +659,82 @@ echo.
 echo !C_DIM!Project directory: %~dp0!C_RESET!
 echo.
 
+if exist "%MISSING_REQ_FILE%" del /q "%MISSING_REQ_FILE%" >nul 2>&1
+if exist "%REQ_RECHECK_FILE%" del /q "%REQ_RECHECK_FILE%" >nul 2>&1
+if exist "%MISSING_REQ_FILE%.tmp" del /q "%MISSING_REQ_FILE%.tmp" >nul 2>&1
+
 pause
 if "!SETUP_INCOMPLETE!"=="0" (
     exit /b 0
 ) else (
     exit /b 1
 )
+
+:COLLECT_MISSING_REQUIREMENTS
+set "REQ_SOURCE_FILE=%~1"
+set "REQ_OUTPUT_FILE=%~2"
+
+if not exist "%REQ_SOURCE_FILE%" (
+    echo !C_RED![NG] requirements.txt was not found.!C_RESET!
+    exit /b 1
+)
+
+type nul > "%REQ_OUTPUT_FILE%"
+
+"%VENV_PYTHON%" -c "exec('import re,sys,importlib.metadata as md\nfrom pip._vendor.packaging.requirements import Requirement\nnorm=lambda s: re.sub(r\"[-_.]+\",\"-\",s).lower()\nreq_file,out_file=sys.argv[1],sys.argv[2]\ninstalled={norm((d.metadata.get(\"Name\") or d.metadata.get(\"name\") or d.name)): d.version for d in md.distributions()}\nmissing=[]\nfor raw in open(req_file, encoding=\"utf-8\").read().splitlines():\n line=raw.strip()\n if not line or line.startswith(\"#\"):\n  continue\n try:\n  req=Requirement(line)\n except Exception:\n  print(\"[NG] Invalid requirement line: {0}\".format(line))\n  missing.append(line)\n  continue\n if req.marker is not None and not req.marker.evaluate():\n  continue\n ver=installed.get(norm(req.name))\n if ver is None:\n  print(\"[NG] Missing package from requirements.txt: {0}\".format(line))\n  missing.append(line)\n  continue\n if req.specifier and not req.specifier.contains(ver, prereleases=True):\n  print(\"[NG] Version mismatch for {0} (installed {1})\".format(line, ver))\n  missing.append(line)\nif missing:\n open(out_file,\"w\",encoding=\"utf-8\",newline=\"\").write(\"\\n\".join(missing)+\"\\n\")\n sys.exit(1)\nsys.exit(0)')" "%REQ_SOURCE_FILE%" "%REQ_OUTPUT_FILE%"
+
+if errorlevel 1 (
+    exit /b 1
+)
+
+exit /b 0
+
+:INSTALL_MISSING_REQUIREMENTS
+set "REQ_INPUT_FILE=%~1"
+
+if not exist "%REQ_INPUT_FILE%" (
+    echo !C_RED![ERROR] Missing requirements list was not found.!C_RESET!
+    exit /b 1
+)
+
+set "PY_REQ_INSTALL_FAILED=0"
+setlocal DisableDelayedExpansion
+for /f "usebackq tokens=* delims=" %%R in ("%REQ_INPUT_FILE%") do (
+    if not "%%R"=="" (
+        echo %C_WHITE%Requirement: %%R%C_RESET%
+        choice /C YN /N /M "Install this requirement? [Y/N]: "
+
+        if errorlevel 2 (
+            echo %C_YELLOW%[SKIP] Requirement installation skipped: %%R%C_RESET%
+            set "PY_REQ_INSTALL_FAILED=1"
+        ) else (
+            "%VENV_PYTHON%" -m pip install "%%R" --progress-bar on
+            if errorlevel 1 (
+                echo %C_RED%[ERROR] Failed to install requirement: %%R%C_RESET%
+                set "PY_REQ_INSTALL_FAILED=1"
+            ) else (
+                > "%REQ_RECHECK_FILE%" (
+                    echo %%R
+                )
+                call :COLLECT_MISSING_REQUIREMENTS "%REQ_RECHECK_FILE%" "%MISSING_REQ_FILE%.tmp"
+                if errorlevel 1 (
+                    echo %C_RED%[ERROR] Re-check failed for requirement: %%R%C_RESET%
+                    set "PY_REQ_INSTALL_FAILED=1"
+                ) else (
+                    echo %C_GREEN%[OK] Requirement installed and verified: %%R%C_RESET%
+                )
+            )
+        )
+        echo.
+    )
+)
+endlocal & set "PY_REQ_INSTALL_FAILED=%PY_REQ_INSTALL_FAILED%"
+
+if exist "%MISSING_REQ_FILE%.tmp" del /q "%MISSING_REQ_FILE%.tmp" >nul 2>&1
+if exist "%REQ_RECHECK_FILE%" del /q "%REQ_RECHECK_FILE%" >nul 2>&1
+
+if "%PY_REQ_INSTALL_FAILED%"=="1" (
+    exit /b 1
+)
+
+exit /b 0

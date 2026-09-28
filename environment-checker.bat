@@ -65,105 +65,11 @@ if not exist "%~dp0tekika-ai-backend\requirements.txt" (
     powershell -NoProfile -Command "Write-Host '    ^> Make sure the complete Tekika AI source files are present.' -ForegroundColor Yellow"
     set /a ERROR_COUNT+=1
 ) else (
-
-    "%PYTHON_CMD%" -c "import fastapi" >nul 2>&1
+    call :CHECK_REQUIREMENTS_WITH_PYTHON "%~dp0tekika-ai-backend\requirements.txt"
     if errorlevel 1 (
-        powershell -NoProfile -Command "Write-Host '[NG] FastAPI' -ForegroundColor Red"
-        powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
-        powershell -NoProfile -Command "Write-Host '    ^> Install the dependencies from requirements.txt.' -ForegroundColor Yellow"
         set /a ERROR_COUNT+=1
     ) else (
-        powershell -NoProfile -Command "Write-Host '[OK] FastAPI' -ForegroundColor Green"
-    )
-
-    "%PYTHON_CMD%" -c "import uvicorn" >nul 2>&1
-    if errorlevel 1 (
-        powershell -NoProfile -Command "Write-Host '[NG] Uvicorn' -ForegroundColor Red"
-        powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
-        powershell -NoProfile -Command "Write-Host '    ^> Install the dependencies from requirements.txt.' -ForegroundColor Yellow"
-        set /a ERROR_COUNT+=1
-    ) else (
-        powershell -NoProfile -Command "Write-Host '[OK] Uvicorn' -ForegroundColor Green"
-    )
-
-    "%PYTHON_CMD%" -c "import pydantic" >nul 2>&1
-    if errorlevel 1 (
-        powershell -NoProfile -Command "Write-Host '[NG] Pydantic' -ForegroundColor Red"
-        powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
-        powershell -NoProfile -Command "Write-Host '    ^> Install the dependencies from requirements.txt.' -ForegroundColor Yellow"
-        set /a ERROR_COUNT+=1
-    ) else (
-        powershell -NoProfile -Command "Write-Host '[OK] Pydantic' -ForegroundColor Green"
-    )
-
-    "%PYTHON_CMD%" -c "import pydantic_settings" >nul 2>&1
-    if errorlevel 1 (
-        powershell -NoProfile -Command "Write-Host '[NG] Pydantic Settings' -ForegroundColor Red"
-        powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
-        powershell -NoProfile -Command "Write-Host '    ^> Install the dependencies from requirements.txt.' -ForegroundColor Yellow"
-        set /a ERROR_COUNT+=1
-    ) else (
-        powershell -NoProfile -Command "Write-Host '[OK] Pydantic Settings' -ForegroundColor Green"
-    )
-
-    "%PYTHON_CMD%" -c "import dotenv" >nul 2>&1
-    if errorlevel 1 (
-        powershell -NoProfile -Command "Write-Host '[NG] python-dotenv' -ForegroundColor Red"
-        powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
-        powershell -NoProfile -Command "Write-Host '    ^> Install the dependencies from requirements.txt.' -ForegroundColor Yellow"
-        set /a ERROR_COUNT+=1
-    ) else (
-        powershell -NoProfile -Command "Write-Host '[OK] python-dotenv' -ForegroundColor Green"
-    )
-
-    "%PYTHON_CMD%" -c "import httpx" >nul 2>&1
-    if errorlevel 1 (
-        powershell -NoProfile -Command "Write-Host '[NG] httpx' -ForegroundColor Red"
-        powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
-        powershell -NoProfile -Command "Write-Host '    ^> Install the dependencies from requirements.txt.' -ForegroundColor Yellow"
-        set /a ERROR_COUNT+=1
-    ) else (
-        powershell -NoProfile -Command "Write-Host '[OK] httpx' -ForegroundColor Green"
-    )
-
-    "%PYTHON_CMD%" -c "import git" >nul 2>&1
-    if errorlevel 1 (
-        powershell -NoProfile -Command "Write-Host '[NG] GitPython' -ForegroundColor Red"
-        powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
-        powershell -NoProfile -Command "Write-Host '    ^> Install the dependencies from requirements.txt.' -ForegroundColor Yellow"
-        set /a ERROR_COUNT+=1
-    ) else (
-        powershell -NoProfile -Command "Write-Host '[OK] GitPython' -ForegroundColor Green"
-    )
-
-    "%PYTHON_CMD%" -c "import chromadb" >nul 2>&1
-    if errorlevel 1 (
-        powershell -NoProfile -Command "Write-Host '[NG] ChromaDB' -ForegroundColor Red"
-        powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
-        powershell -NoProfile -Command "Write-Host '    ^> Install the dependencies from requirements.txt.' -ForegroundColor Yellow"
-        set /a ERROR_COUNT+=1
-    ) else (
-        powershell -NoProfile -Command "Write-Host '[OK] ChromaDB' -ForegroundColor Green"
-    )
-
-    "%PYTHON_CMD%" -c "from PIL import Image" >nul 2>&1
-    if errorlevel 1 (
-        powershell -NoProfile -Command "Write-Host '[NG] Pillow' -ForegroundColor Red"
-        powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
-        powershell -NoProfile -Command "Write-Host '    ^> Install the dependencies from requirements.txt.' -ForegroundColor Yellow"
-        set /a ERROR_COUNT+=1
-    ) else (
-        powershell -NoProfile -Command "Write-Host '[OK] Pillow' -ForegroundColor Green"
-    )
-
-    "%PYTHON_CMD%" -c "import multipart" >nul 2>&1
-    if errorlevel 1 (
-        powershell -NoProfile -Command "Write-Host '[NG] python-multipart' -ForegroundColor Red"
-        powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
-        powershell -NoProfile -Command "Write-Host '    ^> Install the dependencies from requirements.txt.' -ForegroundColor Yellow"
-        set /a ERROR_COUNT+=1
-    ) else (
-        powershell -NoProfile -Command "Write-Host '[OK] python-multipart' -ForegroundColor Green"
+        powershell -NoProfile -Command "Write-Host '[OK] requirements.txt dependencies are satisfied.' -ForegroundColor Green"
     )
 )
 
@@ -387,6 +293,31 @@ if "%ERROR_COUNT%"=="0" (
 ) else (
     exit /b 1
 )
+
+
+REM =========================================
+REM requirements.txt Check
+REM =========================================
+:CHECK_REQUIREMENTS_WITH_PYTHON
+
+if not exist "%~1" (
+    powershell -NoProfile -Command "Write-Host '[NG] requirements.txt was not found.' -ForegroundColor Red"
+    exit /b 1
+)
+
+"%PYTHON_CMD%" -m pip --version >nul 2>&1
+if errorlevel 1 (
+    powershell -NoProfile -Command "Write-Host '[NG] pip is not available in the selected Python environment.' -ForegroundColor Red"
+    exit /b 1
+)
+
+"%PYTHON_CMD%" -c "exec('import re,sys,importlib.metadata as md\nfrom pip._vendor.packaging.requirements import Requirement\nnorm=lambda s: re.sub(r\"[-_.]+\",\"-\",s).lower()\nreq_file=sys.argv[1]\ninstalled={norm((d.metadata.get(\"Name\") or d.metadata.get(\"name\") or d.name)): d.version for d in md.distributions()}\nmissing=[]\nfor raw in open(req_file, encoding=\"utf-8\").read().splitlines():\n line=raw.strip()\n if not line or line.startswith(\"#\"):\n  continue\n try:\n  req=Requirement(line)\n except Exception:\n  print(\"[NG] Invalid requirement line: {0}\".format(line))\n  missing.append(line)\n  continue\n if req.marker is not None and not req.marker.evaluate():\n  continue\n ver=installed.get(norm(req.name))\n if ver is None:\n  print(\"[NG] Missing package from requirements.txt: {0}\".format(line))\n  missing.append(line)\n  continue\n if req.specifier and not req.specifier.contains(ver, prereleases=True):\n  print(\"[NG] Version mismatch for {0} (installed {1})\".format(line, ver))\n  missing.append(line)\nif missing:\n sys.exit(1)\nsys.exit(0)')" "%~1"
+if errorlevel 1 (
+    powershell -NoProfile -Command "Write-Host '    ^> Install missing dependencies from requirements.txt.' -ForegroundColor Yellow"
+    exit /b 1
+)
+
+exit /b 0
 
 
 REM =========================================
