@@ -13,6 +13,8 @@ if errorlevel 1 (
 
 set "BACKEND_DIR=%~dp0tekika-ai-backend"
 set "FRONTEND_DIR=%~dp0tekika-ai-frontend"
+set "VENV_DIR=%BACKEND_DIR%\.venv"
+set "VENV_PYTHON=%VENV_DIR%\Scripts\python.exe"
 set "OLLAMA_URL=https://ollama.com/download/windows"
 set "OLLAMA_PS=irm https://ollama.com/install.ps1 | iex"
 
@@ -64,6 +66,7 @@ rem ================================================================
 
 set "PYTHON_OK=0"
 set "PYTHON_VERSION="
+set "VENV_OK=0"
 set "PYTHON_PACKAGES_OK=0"
 
 set "NODE_OK=0"
@@ -106,17 +109,34 @@ if errorlevel 1 (
     set "PYTHON_OK=0"
     set /a MISSING_COUNT+=1
 ) else (
-    py -c "import sys; sys.exit(0 if sys.version_info >= (3,10) else 1)" >nul 2>&1
+    py -3 -c "import sys; sys.exit(0 if sys.version_info >= (3,10) else 1)" >nul 2>&1
 
     if errorlevel 1 (
         echo !C_RED![NG] Python 3.10 or newer is required.!C_RESET!
-        py --version
+        py -3 --version 2>nul
         set "PYTHON_OK=0"
         set /a MISSING_COUNT+=1
     ) else (
-        for /f "delims=" %%V in ('py --version 2^>^&1') do set "PYTHON_VERSION=%%V"
+        for /f "delims=" %%V in ('py -3 --version 2^>^&1') do set "PYTHON_VERSION=%%V"
         echo !C_GREEN![OK] !C_RESET!!PYTHON_VERSION!
         set "PYTHON_OK=1"
+
+        if exist "%VENV_PYTHON%" (
+            echo !C_GREEN![OK] Reusing virtual environment:!C_RESET! %VENV_DIR%
+            set "VENV_OK=1"
+        ) else (
+            echo !C_CYAN!Creating Python virtual environment in %VENV_DIR%...!C_RESET!
+            py -3 -m venv "%VENV_DIR%"
+            if errorlevel 1 (
+                echo !C_RED![ERROR] Failed to create virtual environment.!C_RESET!
+                echo !C_YELLOW!Run setup again after fixing Python permissions/environment issues.!C_RESET!
+                set "VENV_OK=0"
+                set /a MISSING_COUNT+=1
+            ) else (
+                echo !C_GREEN![OK] Created virtual environment:!C_RESET! %VENV_DIR%
+                set "VENV_OK=1"
+            )
+        )
     )
 )
 
@@ -130,97 +150,28 @@ echo !C_WHITE![2] Checking Python packages!C_RESET!
 echo !C_BLUE!------------------------------------------------------------!C_RESET!
 echo.
 
-if "!PYTHON_OK!"=="1" (
+if "!PYTHON_OK!"=="1" if "!VENV_OK!"=="1" (
     cd /d "%BACKEND_DIR%"
 
-    set "PY_PACKAGES_MISSING=0"
-
-    py -c "import fastapi" >nul 2>&1
-    if errorlevel 1 (
-        echo !C_RED![NG] FastAPI!C_RESET!
-        set "PY_PACKAGES_MISSING=1"
-    ) else (
-        echo !C_GREEN![OK] FastAPI!C_RESET!
-    )
-
-    py -c "import uvicorn" >nul 2>&1
-    if errorlevel 1 (
-        echo !C_RED![NG] Uvicorn!C_RESET!
-        set "PY_PACKAGES_MISSING=1"
-    ) else (
-        echo !C_GREEN![OK] Uvicorn!C_RESET!
-    )
-
-    py -c "import pydantic" >nul 2>&1
-    if errorlevel 1 (
-        echo !C_RED![NG] Pydantic!C_RESET!
-        set "PY_PACKAGES_MISSING=1"
-    ) else (
-        echo !C_GREEN![OK] Pydantic!C_RESET!
-    )
-
-    py -c "import pydantic_settings" >nul 2>&1
-    if errorlevel 1 (
-        echo !C_RED![NG] Pydantic Settings!C_RESET!
-        set "PY_PACKAGES_MISSING=1"
-    ) else (
-        echo !C_GREEN![OK] Pydantic Settings!C_RESET!
-    )
-
-    py -c "import dotenv" >nul 2>&1
-    if errorlevel 1 (
-        echo !C_RED![NG] python-dotenv!C_RESET!
-        set "PY_PACKAGES_MISSING=1"
-    ) else (
-        echo !C_GREEN![OK] python-dotenv!C_RESET!
-    )
-
-    py -c "import httpx" >nul 2>&1
-    if errorlevel 1 (
-        echo !C_RED![NG] httpx!C_RESET!
-        set "PY_PACKAGES_MISSING=1"
-    ) else (
-        echo !C_GREEN![OK] httpx!C_RESET!
-    )
-
-    py -c "import git" >nul 2>&1
-    if errorlevel 1 (
-        echo !C_RED![NG] GitPython!C_RESET!
-        set "PY_PACKAGES_MISSING=1"
-    ) else (
-        echo !C_GREEN![OK] GitPython!C_RESET!
-    )
-
-    py -c "import chromadb" >nul 2>&1
-    if errorlevel 1 (
-        echo !C_RED![NG] ChromaDB!C_RESET!
-        set "PY_PACKAGES_MISSING=1"
-    ) else (
-        echo !C_GREEN![OK] ChromaDB!C_RESET!
-    )
-
-    py -c "from PIL import Image" >nul 2>&1
-    if errorlevel 1 (
-        echo !C_RED![NG] Pillow!C_RESET!
-        set "PY_PACKAGES_MISSING=1"
-    ) else (
-        echo !C_GREEN![OK] Pillow!C_RESET!
-    )
-
-    py -c "import multipart" >nul 2>&1
-    if errorlevel 1 (
-        echo !C_RED![NG] python-multipart!C_RESET!
-        set "PY_PACKAGES_MISSING=1"
-    ) else (
-        echo !C_GREEN![OK] python-multipart!C_RESET!
-    )
-
-    if "!PY_PACKAGES_MISSING!"=="0" (
-        set "PYTHON_PACKAGES_OK=1"
-    ) else (
+    if not exist requirements.txt (
+        echo !C_RED![NG] requirements.txt was not found.!C_RESET!
         set /a MISSING_COUNT+=1
+    ) else (
+        call :VERIFY_REQUIREMENTS
+        if errorlevel 1 (
+            set /a MISSING_COUNT+=1
+        ) else (
+            echo !C_GREEN![OK] All requirements from requirements.txt are installed in .venv.!C_RESET!
+            set "PYTHON_PACKAGES_OK=1"
+        )
     )
-) else (
+)
+
+if "!PYTHON_OK!"=="1" if not "!VENV_OK!"=="1" (
+    echo !C_YELLOW![SKIP] Python packages cannot be checked because .venv is unavailable.!C_RESET!
+)
+
+if not "!PYTHON_OK!"=="1" (
     echo !C_YELLOW![SKIP] Python packages cannot be checked because Python is unavailable.!C_RESET!
 )
 
@@ -238,6 +189,7 @@ node --version >nul 2>&1
 
 if errorlevel 1 (
     echo !C_RED![NG] Node.js was not found.!C_RESET!
+    echo !C_YELLOW![INFO] If Node.js was installed just now, close this terminal and run setup again so PATH is refreshed.!C_RESET!
     set "NODE_OK=0"
     set /a MISSING_COUNT+=1
 ) else (
@@ -260,6 +212,7 @@ call npm --version >nul 2>&1
 
 if errorlevel 1 (
     echo !C_RED![NG] npm was not found.!C_RESET!
+    echo !C_YELLOW![INFO] If Node.js was installed just now, close this terminal and run setup again so PATH is refreshed.!C_RESET!
     set "NPM_OK=0"
     set /a MISSING_COUNT+=1
 ) else (
@@ -380,6 +333,7 @@ if errorlevel 1 (
 
     if errorlevel 1 (
         echo !C_YELLOW![WARN] Ollama is installed but the server is not running.!C_RESET!
+        set /a MISSING_COUNT+=1
     ) else (
         echo !C_GREEN![OK] Ollama server is running.!C_RESET!
         set "OLLAMA_SERVER_OK=1"
@@ -440,7 +394,7 @@ rem ================================================================
 rem Installation approval: Python packages
 rem ================================================================
 
-if "!PYTHON_OK!"=="1" if "!PYTHON_PACKAGES_OK!"=="0" (
+if "!PYTHON_OK!"=="1" if "!VENV_OK!"=="1" if "!PYTHON_PACKAGES_OK!"=="0" (
     echo !C_WHITE!Some Python packages are missing.!C_RESET!
     echo.
     choice /C YN /N /M "Install Python dependencies from requirements.txt? [Y/N]: "
@@ -456,17 +410,28 @@ if "!PYTHON_OK!"=="1" if "!PYTHON_PACKAGES_OK!"=="0" (
         ) else (
             echo.
             echo !C_CYAN!Installing missing Python dependencies from requirements.txt...!C_RESET!
-            py -m pip install -r requirements.txt --progress-bar on
+            "%VENV_PYTHON%" -m pip install -r requirements.txt --progress-bar on
 
             if errorlevel 1 (
                 echo !C_RED![ERROR] Python dependency installation failed.!C_RESET!
+                echo !C_YELLOW![INFO] Setup remains incomplete until all requirements install successfully.!C_RESET!
             ) else (
-                echo !C_GREEN![OK] Python dependencies installed.!C_RESET!
-                set "PYTHON_PACKAGES_OK=1"
+                call :VERIFY_REQUIREMENTS
+                if errorlevel 1 (
+                    echo !C_RED![ERROR] Some requirements are still unavailable in .venv.!C_RESET!
+                ) else (
+                    echo !C_GREEN![OK] Python dependencies installed and verified in .venv.!C_RESET!
+                    set "PYTHON_PACKAGES_OK=1"
+                )
             )
         )
     )
 
+    echo.
+)
+
+if "!PYTHON_OK!"=="1" if not "!VENV_OK!"=="1" (
+    echo !C_YELLOW![WARN] .venv is unavailable, so Python dependencies cannot be installed automatically.!C_RESET!
     echo.
 )
 
@@ -485,6 +450,7 @@ if "!NODE_OK!"=="0" (
         start "" "https://nodejs.org/en/download"
         echo !C_GREEN![OK] Browser opened.!C_RESET!
         echo !C_DIM!Install Node.js manually, then run this setup again.!C_RESET!
+        echo !C_DIM!If Node.js was just installed, restart this terminal to refresh PATH before re-running setup.!C_RESET!
     )
 
     echo.
@@ -514,6 +480,8 @@ if "!NODE_OK!"=="1" if "!NPM_OK!"=="1" if "!FRONTEND_DEPS_OK!"=="0" (
 
         if errorlevel 1 (
             echo !C_RED![ERROR] npm install failed.!C_RESET!
+            echo !C_YELLOW![INFO] Setup remains incomplete until npm install or npm ci succeeds.!C_RESET!
+            echo !C_YELLOW![INFO] If Node.js/npm was installed just now, restart this terminal and run setup again.!C_RESET!
         ) else (
             echo !C_GREEN![OK] Frontend dependencies installed.!C_RESET!
             set "FRONTEND_DEPS_OK=1"
@@ -627,6 +595,31 @@ rem ================================================================
 rem Final environment creation
 rem ================================================================
 
+:VERIFY_REQUIREMENTS
+if not exist "%BACKEND_DIR%\requirements.txt" (
+    echo !C_RED![NG] requirements.txt was not found.!C_RESET!
+    exit /b 1
+)
+
+set "REQ_MISSING=0"
+for /f "usebackq tokens=* delims=" %%R in ("%BACKEND_DIR%\requirements.txt") do (
+    set "REQ_LINE=%%R"
+    if not "!REQ_LINE!"=="" if not "!REQ_LINE:~0,1!"=="#" (
+        for /f "tokens=1 delims=<>=!~[" %%P in ("!REQ_LINE!") do (
+            "%VENV_PYTHON%" -m pip show "%%P" >nul 2>&1
+            if errorlevel 1 (
+                echo !C_RED![NG] Missing package from requirements.txt: %%P!C_RESET!
+                set "REQ_MISSING=1"
+            )
+        )
+    )
+)
+
+if "!REQ_MISSING!"=="1" (
+    exit /b 1
+)
+exit /b 0
+
 :CREATE_ENV_AND_FINISH
 
 cd /d "%BACKEND_DIR%"
@@ -643,11 +636,31 @@ rem ================================================================
 
 echo.
 echo !C_CYAN!============================================================!C_RESET!
-echo !C_GREEN!                    SETUP COMPLETED!C_RESET!
+set "SETUP_INCOMPLETE=0"
+if not "!PYTHON_OK!"=="1" set "SETUP_INCOMPLETE=1"
+if not "!VENV_OK!"=="1" set "SETUP_INCOMPLETE=1"
+if not "!PYTHON_PACKAGES_OK!"=="1" set "SETUP_INCOMPLETE=1"
+if not "!NODE_OK!"=="1" set "SETUP_INCOMPLETE=1"
+if not "!NPM_OK!"=="1" set "SETUP_INCOMPLETE=1"
+if not "!FRONTEND_DEPS_OK!"=="1" set "SETUP_INCOMPLETE=1"
+if not "!ENV_OK!"=="1" set "SETUP_INCOMPLETE=1"
+if not "!BACKEND_DIRS_OK!"=="1" set "SETUP_INCOMPLETE=1"
+if /I "!LLM_PROVIDER!"=="ollama" (
+    if not "!OLLAMA_OK!"=="1" set "SETUP_INCOMPLETE=1"
+    if not "!OLLAMA_SERVER_OK!"=="1" set "SETUP_INCOMPLETE=1"
+    if not "!OLLAMA_MODEL_OK!"=="1" set "SETUP_INCOMPLETE=1"
+)
+
+if "!SETUP_INCOMPLETE!"=="0" (
+    echo !C_GREEN!                    SETUP COMPLETED!C_RESET!
+) else (
+    echo !C_RED!                    SETUP INCOMPLETE!C_RESET!
+)
 echo !C_CYAN!============================================================!C_RESET!
 echo.
 
 if "!PYTHON_OK!"=="1" (echo [OK] Python !PYTHON_VERSION!) else (echo [WARN] Python installation is still required.)
+if "!VENV_OK!"=="1" (echo [OK] Python virtual environment .venv) else (echo [WARN] Python virtual environment creation/reuse failed.)
 if "!PYTHON_PACKAGES_OK!"=="1" (echo [OK] Python packages) else (echo [WARN] Python packages are missing or were skipped.)
 if "!NODE_OK!"=="1" (echo [OK] Node.js !NODE_VERSION!) else (echo [WARN] Node.js installation is still required.)
 if "!NPM_OK!"=="1" (echo [OK] npm !NPM_VERSION!) else (echo [WARN] npm was not found.)
@@ -663,7 +676,11 @@ if /I not "!LLM_PROVIDER!"=="ollama" (
 )
 echo.
 
-echo !C_WHITE!The setup process is complete.!C_RESET!
+if "!SETUP_INCOMPLETE!"=="0" (
+    echo !C_WHITE!The setup process is complete.!C_RESET!
+) else (
+    echo !C_YELLOW!Some required setup steps are incomplete. Fix the warnings above and run setup again.!C_RESET!
+)
 echo.
 echo !C_WHITE!Next steps:!C_RESET!
 echo   1. Run environment-checker.bat
@@ -675,4 +692,8 @@ echo !C_DIM!Project directory: %~dp0!C_RESET!
 echo.
 
 pause
-exit /b 0
+if "!SETUP_INCOMPLETE!"=="0" (
+    exit /b 0
+) else (
+    exit /b 1
+)

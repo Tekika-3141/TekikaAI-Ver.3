@@ -5,6 +5,9 @@ setlocal EnableExtensions EnableDelayedExpansion
 title Tekika AI - Environment Checker
 
 cd /d "%~dp0"
+set "BACKEND_DIR=%~dp0tekika-ai-backend"
+set "VENV_PYTHON=%BACKEND_DIR%\.venv\Scripts\python.exe"
+set "PYTHON_CMD=py"
 
 echo =========================================
 echo       Tekika AI Environment Checker
@@ -32,6 +35,19 @@ if errorlevel 1 (
 ) else (
     powershell -NoProfile -Command "Write-Host '[OK] Python' -ForegroundColor Green"
     py --version
+
+    py -3 -c "import sys; sys.exit(0 if sys.version_info >= (3,10) else 1)" >nul 2>&1
+    if errorlevel 1 (
+        powershell -NoProfile -Command "Write-Host '[NG] Python 3.10 or newer is required.' -ForegroundColor Red"
+        set /a ERROR_COUNT+=1
+    )
+
+    if exist "%VENV_PYTHON%" (
+        set "PYTHON_CMD=%VENV_PYTHON%"
+        powershell -NoProfile -Command "Write-Host '[OK] Using .venv Python for package checks.' -ForegroundColor Green"
+    ) else (
+        powershell -NoProfile -Command "Write-Host '[WARN] .venv was not found. Falling back to global py.' -ForegroundColor Yellow"
+    )
 )
 
 echo.
@@ -50,7 +66,7 @@ if not exist "%~dp0tekika-ai-backend\requirements.txt" (
     set /a ERROR_COUNT+=1
 ) else (
 
-    py -c "import fastapi" >nul 2>&1
+    "%PYTHON_CMD%" -c "import fastapi" >nul 2>&1
     if errorlevel 1 (
         powershell -NoProfile -Command "Write-Host '[NG] FastAPI' -ForegroundColor Red"
         powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
@@ -60,7 +76,7 @@ if not exist "%~dp0tekika-ai-backend\requirements.txt" (
         powershell -NoProfile -Command "Write-Host '[OK] FastAPI' -ForegroundColor Green"
     )
 
-    py -c "import uvicorn" >nul 2>&1
+    "%PYTHON_CMD%" -c "import uvicorn" >nul 2>&1
     if errorlevel 1 (
         powershell -NoProfile -Command "Write-Host '[NG] Uvicorn' -ForegroundColor Red"
         powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
@@ -70,7 +86,7 @@ if not exist "%~dp0tekika-ai-backend\requirements.txt" (
         powershell -NoProfile -Command "Write-Host '[OK] Uvicorn' -ForegroundColor Green"
     )
 
-    py -c "import pydantic" >nul 2>&1
+    "%PYTHON_CMD%" -c "import pydantic" >nul 2>&1
     if errorlevel 1 (
         powershell -NoProfile -Command "Write-Host '[NG] Pydantic' -ForegroundColor Red"
         powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
@@ -80,7 +96,7 @@ if not exist "%~dp0tekika-ai-backend\requirements.txt" (
         powershell -NoProfile -Command "Write-Host '[OK] Pydantic' -ForegroundColor Green"
     )
 
-    py -c "import pydantic_settings" >nul 2>&1
+    "%PYTHON_CMD%" -c "import pydantic_settings" >nul 2>&1
     if errorlevel 1 (
         powershell -NoProfile -Command "Write-Host '[NG] Pydantic Settings' -ForegroundColor Red"
         powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
@@ -90,7 +106,7 @@ if not exist "%~dp0tekika-ai-backend\requirements.txt" (
         powershell -NoProfile -Command "Write-Host '[OK] Pydantic Settings' -ForegroundColor Green"
     )
 
-    py -c "import dotenv" >nul 2>&1
+    "%PYTHON_CMD%" -c "import dotenv" >nul 2>&1
     if errorlevel 1 (
         powershell -NoProfile -Command "Write-Host '[NG] python-dotenv' -ForegroundColor Red"
         powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
@@ -100,7 +116,7 @@ if not exist "%~dp0tekika-ai-backend\requirements.txt" (
         powershell -NoProfile -Command "Write-Host '[OK] python-dotenv' -ForegroundColor Green"
     )
 
-    py -c "import httpx" >nul 2>&1
+    "%PYTHON_CMD%" -c "import httpx" >nul 2>&1
     if errorlevel 1 (
         powershell -NoProfile -Command "Write-Host '[NG] httpx' -ForegroundColor Red"
         powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
@@ -110,7 +126,7 @@ if not exist "%~dp0tekika-ai-backend\requirements.txt" (
         powershell -NoProfile -Command "Write-Host '[OK] httpx' -ForegroundColor Green"
     )
 
-    py -c "import git" >nul 2>&1
+    "%PYTHON_CMD%" -c "import git" >nul 2>&1
     if errorlevel 1 (
         powershell -NoProfile -Command "Write-Host '[NG] GitPython' -ForegroundColor Red"
         powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
@@ -120,7 +136,7 @@ if not exist "%~dp0tekika-ai-backend\requirements.txt" (
         powershell -NoProfile -Command "Write-Host '[OK] GitPython' -ForegroundColor Green"
     )
 
-    py -c "import chromadb" >nul 2>&1
+    "%PYTHON_CMD%" -c "import chromadb" >nul 2>&1
     if errorlevel 1 (
         powershell -NoProfile -Command "Write-Host '[NG] ChromaDB' -ForegroundColor Red"
         powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
@@ -130,7 +146,7 @@ if not exist "%~dp0tekika-ai-backend\requirements.txt" (
         powershell -NoProfile -Command "Write-Host '[OK] ChromaDB' -ForegroundColor Green"
     )
 
-    py -c "from PIL import Image" >nul 2>&1
+    "%PYTHON_CMD%" -c "from PIL import Image" >nul 2>&1
     if errorlevel 1 (
         powershell -NoProfile -Command "Write-Host '[NG] Pillow' -ForegroundColor Red"
         powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
@@ -140,7 +156,7 @@ if not exist "%~dp0tekika-ai-backend\requirements.txt" (
         powershell -NoProfile -Command "Write-Host '[OK] Pillow' -ForegroundColor Green"
     )
 
-    py -c "import multipart" >nul 2>&1
+    "%PYTHON_CMD%" -c "import multipart" >nul 2>&1
     if errorlevel 1 (
         powershell -NoProfile -Command "Write-Host '[NG] python-multipart' -ForegroundColor Red"
         powershell -NoProfile -Command "Write-Host '    ^> Required Python package is missing.' -ForegroundColor Yellow"
@@ -178,6 +194,7 @@ if errorlevel 1 (
     powershell -NoProfile -Command "Write-Host '[NG] npm was not found.' -ForegroundColor Red"
     powershell -NoProfile -Command "Write-Host '    ^> npm is included with Node.js.' -ForegroundColor Yellow"
     powershell -NoProfile -Command "Write-Host '    ^> Reinstall Node.js if npm is unavailable.' -ForegroundColor Yellow"
+    powershell -NoProfile -Command "Write-Host '    ^> If Node.js was installed just now, restart this terminal and run the checker again.' -ForegroundColor Yellow"
     set /a ERROR_COUNT+=1
 ) else (
     powershell -NoProfile -Command "Write-Host '[OK] npm' -ForegroundColor Green"
@@ -265,16 +282,6 @@ echo -----------------------------------------
 if /I not "!LLM_PROVIDER!"=="ollama" (
     powershell -NoProfile -Command "Write-Host '[SKIP] LLM_PROVIDER is not ollama. Ollama check skipped.' -ForegroundColor Yellow"
 ) else (
-    py -c "import ollama" >nul 2>&1
-
-    if errorlevel 1 (
-        powershell -NoProfile -Command "Write-Host '[NG] Ollama Python Library' -ForegroundColor Red"
-        powershell -NoProfile -Command "Write-Host '    ^> The Ollama Python library is missing.' -ForegroundColor Yellow"
-        set /a ERROR_COUNT+=1
-    ) else (
-        powershell -NoProfile -Command "Write-Host '[OK] Ollama Python Library' -ForegroundColor Green"
-    )
-
     ollama --version >nul 2>&1
 
     if errorlevel 1 (
@@ -375,7 +382,11 @@ echo Press Enter to exit.
 echo.
 
 pause
-exit /b
+if "%ERROR_COUNT%"=="0" (
+    exit /b 0
+) else (
+    exit /b 1
+)
 
 
 REM =========================================
